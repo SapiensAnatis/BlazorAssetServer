@@ -1,0 +1,77 @@
+﻿@using System.ComponentModel.DataAnnotations;
+@using AssetServer.Services;
+@inject ILogger<Login> Logger;
+@inject IHostEnvironmentAuthenticationStateProvider Authentication
+@inject AuthenticationService AuthenticationService
+
+
+<div id="login">
+    <h2>Login</h2>
+    <span class="oi oi-lock-locked" aria-hidden="true"></span>
+    <EditForm EditContext="editContext" OnSubmit="HandleLogin">
+        <div class="mb-3">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <label for="jwt-input" class="form-label">Access token:</label>
+            <InputText @bind-Value="loginModel.Jwt" id="jwt-input" class="form-control" aria-describedby="jwt-help"></InputText>
+            <div id="jwt-help", class="form-text">This can be found in the server console.</div>
+            
+        </div>
+
+        <button type="submit" class="btn btn-primary">Submit</button>
+        <button type="button" class="btn btn-secondary" @onclick="IssueToken">Issue new token</button>
+    </EditForm>
+</div>
+
+
+@code {
+    public class LoginModel
+    {
+        private string jwt = string.Empty;
+
+        [Required(ErrorMessage = "Token is required.")]
+        public string Jwt
+        {
+            get => this.jwt;
+            set => this.jwt = value.Trim();
+        }
+    }
+
+    private EditContext? editContext;
+    private ValidationMessageStore? messageStore;
+    private readonly LoginModel loginModel = new();
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        this.editContext = new(this.loginModel);
+        this.messageStore = new(this.editContext);
+    }
+
+    private void HandleLogin()
+    {
+        this.messageStore?.Clear();
+
+        if (this.editContext?.Validate() != true)
+            return;
+
+        try
+        {
+            this.Authentication.SetAuthenticationState(this.AuthenticationService.HandleAuthenticateAsync(this.loginModel));
+        } 
+        catch (Exception e)
+        {
+            this.Logger.LogError(e, "Authentication error");
+
+            this.messageStore?.Add(() => loginModel.Jwt, $"Unauthorized: invalid token.");
+            return;
+        }
+    }
+
+    private void IssueToken()
+    {
+        this.AuthenticationService.IssueToken();
+    }
+}

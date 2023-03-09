@@ -1,0 +1,89 @@
+﻿@page "/configuration"
+@using AssetServer.Models;
+@using AssetServer.Services;
+
+@inject ILogger<Configuration> logger;
+@inject ConfigurationService configurationService
+
+<PageTitle>Configuration</PageTitle>
+
+<h2>Configuration</h2>
+<hr>
+
+<div class="configuration">
+    <div class="container-lg mt-3">
+        <EditForm EditContext="editContext">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <h4>Filepaths:</h4>
+            <div class="mb-3">
+                <label for="android-path" class="form-label">Android asset directory:</label>
+                <InputText class="form-control" id="android-path" @bind-Value="configModel.AndroidFilepath" aria-describedby="android-path-help"></InputText>
+                <div id="android-path-help" class="form-text">Path to the folder containing Android assets. Can be absolute or relative.</div>
+            </div>
+            <div class="mb-3">
+                <label for="ios-path" class="form-label">iOS asset directory:</label>
+                <InputText class="form-control" id="ios-path" @bind-Value="configModel.IosFilepath" aria-describedby="ios-path-help"></InputText>
+                <div id="ios-path-help" class="form-text">Path to the folder containing iOS assets. Can be absolute or relative.</div>
+            </div>
+            <div class="mb-3">
+                <label for="manifest-path" class="form-label">Manifest path:</label>
+                <InputText class="form-control" id="manifest-path" @bind-Value="configModel.ManifestPath" aria-describedby="manifest-path-help"></InputText>
+                <div id="manifest-path-help" class="form-text">Path to the folder containing manifest files. Can be absolute or relative.</div>
+            </div>
+            <h4>Override assets</h4>
+            <div class="mb-3">
+                <InputCheckbox class="form-check-input" id="enable-override" @bind-Value="configModel.EnableOverride"></InputCheckbox>
+                <label for="enable-override" class="form-check-label">Enable modded asset overrides</label>
+            </div>
+
+            <button class="btn btn-primary" type="submit" @onclick="HandleSubmit">Apply</button>
+            @if (SuccessfulSubmit)
+            {
+                <div id="submit-success" class="alert-success mt-3">Saved changes successfully!</div>
+            }
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private ConfigurationModel configModel = null!;
+    private EditContext editContext = null!;
+    private ValidationMessageStore messageStore = null!;
+    private bool SuccessfulSubmit = false;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        this.configModel = configurationService.CurrentValue;
+
+        this.editContext = new(this.configModel);
+        this.messageStore = new(this.editContext);
+    }
+
+    private void HandleSubmit()
+    {
+        this.messageStore.Clear();
+        this.SuccessfulSubmit = false;
+
+        if (this.editContext?.Validate() != true)
+        {
+            this.StateHasChanged();
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(this.configModel.AndroidFilepath) && string.IsNullOrWhiteSpace(this.configModel.IosFilepath))
+        {
+            this.messageStore.Add(() => this.configModel, "At least one asset filepath must be specified.");
+            this.StateHasChanged();
+            return;
+        }
+
+        this.configurationService.SaveChanges(configModel);
+        this.SuccessfulSubmit = true;
+        this.logger.LogInformation("Updated configuration: {@config}", configModel);
+        this.StateHasChanged();
+    }
+}
